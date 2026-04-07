@@ -1,6 +1,6 @@
 @echo off
 echo ============================================
-echo    Home Movies - Windows Setup & Launch
+echo    Home Movies - Windows Setup ^& Launch
 echo ============================================
 echo.
 
@@ -28,27 +28,35 @@ REM Install dependencies
 echo Installing dependencies...
 pip install -r requirements.txt --quiet
 
-REM Set environment variables (edit these!)
-echo.
-echo ============================================
-echo    CONFIGURATION
-echo ============================================
-echo.
+REM ============================================
+REM    EDIT YOUR SETTINGS BELOW
+REM ============================================
 
-REM --- EDIT THESE VALUES ---
+REM --- Login credentials ---
 set APP_USERNAME=admin
 set APP_PASSWORD=changeme
-set SECRET_KEY=change-this-to-a-random-string
-REM Optionally restrict to specific drives (comma-separated):
+
+REM --- Secret key (change to any random text) ---
+set SECRET_KEY=my-super-secret-key-change-me
+
+REM --- ngrok: enables public internet access ---
+REM 1. Sign up free at https://ngrok.com
+REM 2. Copy your auth token from https://dashboard.ngrok.com/get-started/your-authtoken
+REM 3. Paste it below:
+set NGROK_AUTH_TOKEN=
+set USE_NGROK=true
+
+REM --- Optionally restrict which drives are shown (comma-separated) ---
 REM set ALLOWED_DRIVES=C,D,E
 
-echo Username: %APP_USERNAME%
-echo Password: %APP_PASSWORD%
-echo Mode: Windows Drive Browsing
+REM ============================================
 echo.
-echo ============================================
-echo    Starting Home Movies Server...
-echo    Open http://localhost:5000 in your browser
+echo  Username: %APP_USERNAME%
+echo  Password: %APP_PASSWORD%
+echo  ngrok:    %USE_NGROK%
+echo.
+echo  Starting server...
+echo  Local URL: http://localhost:5000
 echo ============================================
 echo.
 
