@@ -449,55 +449,21 @@ def delete():
 
 
 # ---------------------------------------------------------------------------
-# Startup with optional ngrok tunnel
+# Startup
 # ---------------------------------------------------------------------------
-def start_ngrok(port):
-    """Start ngrok tunnel and print the public URL."""
-    try:
-        from pyngrok import ngrok, conf
-
-        # Set auth token if provided
-        ngrok_token = os.environ.get("NGROK_AUTH_TOKEN", "")
-        if ngrok_token:
-            conf.get_default().auth_token = ngrok_token
-        else:
-            print("\n⚠️  No NGROK_AUTH_TOKEN set. You need a free ngrok account.")
-            print("   1. Sign up at https://ngrok.com (free)")
-            print("   2. Copy your auth token from https://dashboard.ngrok.com/get-started/your-authtoken")
-            print("   3. Set it in run_windows.bat or as environment variable")
-            print("   Starting without ngrok (local access only)...\n")
-            return None
-
-        # Start tunnel
-        public_url = ngrok.connect(port, bind_tls=True).public_url
-        print("\n" + "=" * 60)
-        print("  🌐 PUBLIC URL (share this!):")
-        print(f"  {public_url}")
-        print("=" * 60)
-        print(f"  🏠 Local URL: http://localhost:{port}")
-        print("=" * 60 + "\n")
-        return public_url
-
-    except ImportError:
-        print("\n⚠️  pyngrok not installed. Run: pip install pyngrok")
-        print("   Starting without ngrok (local access only)...\n")
-        return None
-    except Exception as e:
-        print(f"\n⚠️  ngrok error: {e}")
-        print("   Starting without ngrok (local access only)...\n")
-        return None
-
-
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
-    use_ngrok = os.environ.get("USE_NGROK", "true" if IS_WINDOWS else "false").lower() == "true"
-
-    if use_ngrok:
-        start_ngrok(port)
-
-    print(f"🎬 Home Movies running on http://localhost:{port}")
-    print(f"📂 Browse mode: {BROWSE_MODE}")
+    print()
+    print("=" * 60)
+    print("  � Home Movies Server")
+    print("=" * 60)
+    print(f"  🏠 Local URL:    http://localhost:{port}")
+    print(f"  📂 Browse mode:  {BROWSE_MODE}")
     if BROWSE_MODE == "drives":
-        print("💾 Drive browsing enabled — all Windows drives accessible")
+        print("  💾 Drive browsing enabled — all Windows drives accessible")
+    print()
+    print("  For public access, run Cloudflare Tunnel in another terminal:")
+    print(f"  cloudflared tunnel run homemovies")
+    print("=" * 60)
     print()
     app.run(host="0.0.0.0", port=port, debug=False)
