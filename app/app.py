@@ -3,7 +3,7 @@ import secrets
 from pathlib import Path
 from flask import (
     Flask, render_template, request, redirect, url_for,
-    flash, send_from_directory, abort
+    flash, send_from_directory, abort, session, make_response
 )
 from flask_login import (
     LoginManager, UserMixin, login_user, logout_user,
@@ -32,6 +32,98 @@ ALLOWED_EXTENSIONS = {
 
 MAX_CONTENT_LENGTH = int(os.environ.get("MAX_UPLOAD_GB", 10)) * 1024 * 1024 * 1024  # default 10 GB
 app.config["MAX_CONTENT_LENGTH"] = MAX_CONTENT_LENGTH
+
+# ---------------------------------------------------------------------------
+# Themes
+# ---------------------------------------------------------------------------
+THEMES = {
+    "cinema": {
+        "name": "🎬 Cinema Night",
+        "description": "Classic dark cinema experience",
+        "navbar_bg": "linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)",
+        "body_bg": "#0f0f1a",
+        "card_bg": "rgba(22, 33, 62, 0.9)",
+        "accent": "#e94560",
+        "accent_hover": "#ff6b81",
+        "text": "#eee",
+        "icon": "bi-camera-reels-fill",
+        "bg_image": "https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=1920&q=80",
+    },
+    "popcorn": {
+        "name": "🍿 Popcorn Party",
+        "description": "Fun and warm movie night vibes",
+        "navbar_bg": "linear-gradient(135deg, #2d1b00 0%, #4a2c00 100%)",
+        "body_bg": "#1a1000",
+        "card_bg": "rgba(74, 44, 0, 0.85)",
+        "accent": "#f5c518",
+        "accent_hover": "#ffd740",
+        "text": "#fff",
+        "icon": "bi-film",
+        "bg_image": "https://images.unsplash.com/photo-1585647347483-22b66260dfff?w=1920&q=80",
+    },
+    "retro": {
+        "name": "📺 Retro TV",
+        "description": "Vintage television nostalgia",
+        "navbar_bg": "linear-gradient(135deg, #1b2838 0%, #2a3f54 100%)",
+        "body_bg": "#0d1b2a",
+        "card_bg": "rgba(27, 40, 56, 0.9)",
+        "accent": "#00d4aa",
+        "accent_hover": "#00ffcc",
+        "text": "#c0d0e0",
+        "icon": "bi-tv-fill",
+        "bg_image": "https://images.unsplash.com/photo-1522869635100-9f4c5e86aa37?w=1920&q=80",
+    },
+    "horror": {
+        "name": "🧛 Horror Night",
+        "description": "Spooky dark atmosphere",
+        "navbar_bg": "linear-gradient(135deg, #1a0000 0%, #330000 100%)",
+        "body_bg": "#0a0000",
+        "card_bg": "rgba(51, 0, 0, 0.85)",
+        "accent": "#ff0033",
+        "accent_hover": "#ff3355",
+        "text": "#ccaaaa",
+        "icon": "bi-lightning-fill",
+        "bg_image": "https://images.unsplash.com/photo-1509248961406-689250585460?w=1920&q=80",
+    },
+    "scifi": {
+        "name": "🚀 Sci-Fi",
+        "description": "Futuristic space adventure",
+        "navbar_bg": "linear-gradient(135deg, #0a0a2a 0%, #1a0a3a 100%)",
+        "body_bg": "#05051a",
+        "card_bg": "rgba(26, 10, 58, 0.85)",
+        "accent": "#7b2ff7",
+        "accent_hover": "#9d5cff",
+        "text": "#d0c0ff",
+        "icon": "bi-stars",
+        "bg_image": "https://images.unsplash.com/photo-1534796636912-3b95b3ab5986?w=1920&q=80",
+    },
+    "family": {
+        "name": "👨‍👩‍👧‍👦 Family Time",
+        "description": "Warm and cozy for family movies",
+        "navbar_bg": "linear-gradient(135deg, #1a3c34 0%, #2d5a47 100%)",
+        "body_bg": "#0f2318",
+        "card_bg": "rgba(45, 90, 71, 0.85)",
+        "accent": "#4caf50",
+        "accent_hover": "#69c56d",
+        "text": "#d0ecd0",
+        "icon": "bi-house-heart-fill",
+        "bg_image": "https://images.unsplash.com/photo-1536440136628-849c177e76a1?w=1920&q=80",
+    },
+}
+DEFAULT_THEME = "cinema"
+
+
+def get_current_theme():
+    theme_id = request.cookies.get("theme", DEFAULT_THEME)
+    if theme_id not in THEMES:
+        theme_id = DEFAULT_THEME
+    return theme_id, THEMES[theme_id]
+
+
+@app.context_processor
+def inject_theme():
+    theme_id, theme = get_current_theme()
+    return {"current_theme_id": theme_id, "current_theme": theme, "all_themes": THEMES}
 
 # ---------------------------------------------------------------------------
 # Authentication – simple user store via env vars
@@ -134,6 +226,16 @@ def logout():
     logout_user()
     flash("You have been logged out.", "info")
     return redirect(url_for("login"))
+
+
+@app.route("/set-theme/<theme_id>")
+@login_required
+def set_theme(theme_id):
+    if theme_id not in THEMES:
+        theme_id = DEFAULT_THEME
+    resp = make_response(redirect(request.referrer or url_for("browse")))
+    resp.set_cookie("theme", theme_id, max_age=60 * 60 * 24 * 365)
+    return resp
 
 
 @app.route("/")
