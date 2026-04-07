@@ -1,0 +1,255 @@
+{% extends "base.html" %}
+{% block title %}Browse – Home Movies{% endblock %}
+
+{% block content %}
+<!-- Breadcrumb Navigation -->
+<nav aria-label="breadcrumb">
+  <ol class="breadcrumb">
+    {% for crumb in breadcrumbs %}
+      {% if loop.last %}
+        <li class="breadcrumb-item active">{{ crumb.name }}</li>
+      {% else %}
+        <li class="breadcrumb-item">
+          <a href="{{ url_for('browse', subpath=crumb.path) }}">{{ crumb.name }}</a>
+        </li>
+      {% endif %}
+    {% endfor %}
+  </ol>
+</nav>
+
+<!-- Toolbar -->
+<div class="d-flex flex-wrap gap-2 mb-3">
+  <!-- Upload Button -->
+  <button class="btn btn-success btn-sm" data-bs-toggle="collapse" data-bs-target="#uploadArea">
+    <i class="bi bi-cloud-arrow-up"></i> Upload Files
+  </button>
+  <!-- New Folder Button -->
+  <button class="btn btn-outline-light btn-sm" data-bs-toggle="modal" data-bs-target="#newFolderModal">
+    <i class="bi bi-folder-plus"></i> New Folder
+  </button>
+</div>
+
+<!-- Upload Area (collapsible) -->
+<div class="collapse mb-4" id="uploadArea">
+  <form method="POST" action="{{ url_for('upload') }}" enctype="multipart/form-data" id="uploadForm">
+    <input type="hidden" name="subpath" value="{{ subpath }}">
+    <div class="drop-zone" id="dropZone">
+      <i class="bi bi-cloud-arrow-up" style="font-size: 2rem;"></i>
+      <p class="mb-1">Drag &amp; drop movie files here, or click to select</p>
+      <small class="text-secondary">Supports: mp4, mkv, avi, mov, wmv, flv, webm, m4v, mpg, ts, vob, 3gp</small>
+      <input type="file" name="files" id="fileInput" multiple class="d-none"
+             accept=".mp4,.mkv,.avi,.mov,.wmv,.flv,.webm,.m4v,.mpg,.mpeg,.ts,.vob,.3gp,.srt,.sub,.ass,.jpg,.jpeg,.png,.nfo">
+    </div>
+    <div id="fileList" class="mt-2"></div>
+    <div class="upload-progress mt-2" id="uploadProgress">
+      <div class="progress">
+        <div class="progress-bar progress-bar-striped progress-bar-animated" id="progressBar"
+             role="progressbar" style="width: 0%">0%</div>
+      </div>
+      <small class="text-secondary" id="uploadStatus"></small>
+    </div>
+    <button type="submit" class="btn btn-primary mt-2" id="uploadBtn" disabled>
+      <i class="bi bi-upload"></i> Upload
+    </button>
+  </form>
+</div>
+
+<!-- File Browser Table -->
+<div class="table-responsive">
+  <table class="table table-hover align-middle">
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th style="width:120px" class="text-end">Size</th>
+        <th style="width:140px" class="text-center">Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% if subpath %}
+      <tr>
+        <td colspan="3">
+          <a href="{{ url_for('browse', subpath=subpath.rsplit('/', 1)[0] if '/' in subpath else '') }}"
+             class="text-decoration-none">
+            <i class="bi bi-arrow-left file-icon"></i> .. (back)
+          </a>
+        </td>
+      </tr>
+      {% endif %}
+
+      {% for folder in folders %}
+      <tr>
+        <td>
+          <a href="{{ url_for('browse', subpath=(subpath + '/' + folder.name) if subpath else folder.name) }}"
+             class="text-decoration-none text-warning">
+            <i class="bi bi-folder-fill file-icon"></i> {{ folder.name }}
+          </a>
+        </td>
+        <td class="text-end text-secondary">—</td>
+        <td class="text-center">
+          <form method="POST" action="{{ url_for('delete') }}" class="d-inline"
+                onsubmit="return confirm('Delete folder \'{{ folder.name }}\' and ALL its contents?')">
+            <input type="hidden" name="subpath" value="{{ subpath }}">
+            <input type="hidden" name="filename" value="{{ folder.name }}">
+            <button type="submit" class="btn btn-outline-danger btn-sm" title="Delete">
+              <i class="bi bi-trash"></i>
+            </button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+
+      {% for file in files %}
+      <tr>
+        <td>
+          {% if file.name.rsplit('.', 1)[-1].lower() in ('mp4','mkv','avi','mov','wmv','flv','webm','m4v','mpg','mpeg','ts','vob','3gp') %}
+            <i class="bi bi-camera-reels file-icon text-info"></i>
+          {% elif file.name.rsplit('.', 1)[-1].lower() in ('srt','sub','ass') %}
+            <i class="bi bi-card-text file-icon text-secondary"></i>
+          {% elif file.name.rsplit('.', 1)[-1].lower() in ('jpg','jpeg','png') %}
+            <i class="bi bi-image file-icon text-success"></i>
+          {% else %}
+            <i class="bi bi-file-earmark file-icon"></i>
+          {% endif %}
+          {{ file.name }}
+        </td>
+        <td class="text-end text-secondary">{{ file.size }}</td>
+        <td class="text-center">
+          <a href="{{ url_for('download', subpath=(subpath + '/' + file.name) if subpath else file.name) }}"
+             class="btn btn-outline-primary btn-sm me-1" title="Download">
+            <i class="bi bi-download"></i>
+          </a>
+          <form method="POST" action="{{ url_for('delete') }}" class="d-inline"
+                onsubmit="return confirm('Delete \'{{ file.name }}\'?')">
+            <input type="hidden" name="subpath" value="{{ subpath }}">
+            <input type="hidden" name="filename" value="{{ file.name }}">
+            <button type="submit" class="btn btn-outline-danger btn-sm" title="Delete">
+              <i class="bi bi-trash"></i>
+            </button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+
+      {% if not folders and not files %}
+      <tr>
+        <td colspan="3" class="text-center text-secondary py-5">
+          <i class="bi bi-inbox" style="font-size:2rem;"></i>
+          <p class="mt-2">This folder is empty. Upload some movies!</p>
+        </td>
+      </tr>
+      {% endif %}
+    </tbody>
+  </table>
+</div>
+
+<!-- New Folder Modal -->
+<div class="modal fade" id="newFolderModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="POST" action="{{ url_for('create_folder') }}">
+        <input type="hidden" name="subpath" value="{{ subpath }}">
+        <div class="modal-header">
+          <h5 class="modal-title"><i class="bi bi-folder-plus"></i> New Folder</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <input type="text" class="form-control" name="folder_name"
+                 placeholder="Folder name" required autofocus>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary">Create</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  const dropZone = document.getElementById('dropZone');
+  const fileInput = document.getElementById('fileInput');
+  const fileList = document.getElementById('fileList');
+  const uploadBtn = document.getElementById('uploadBtn');
+  const uploadForm = document.getElementById('uploadForm');
+  const uploadProgress = document.getElementById('uploadProgress');
+  const progressBar = document.getElementById('progressBar');
+  const uploadStatus = document.getElementById('uploadStatus');
+
+  // Click to select files
+  dropZone.addEventListener('click', () => fileInput.click());
+
+  // Drag & drop
+  dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('dragover'); });
+  dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+  dropZone.addEventListener('drop', (e) => {
+    e.preventDefault();
+    dropZone.classList.remove('dragover');
+    fileInput.files = e.dataTransfer.files;
+    updateFileList();
+  });
+
+  fileInput.addEventListener('change', updateFileList);
+
+  function updateFileList() {
+    const files = fileInput.files;
+    if (files.length === 0) {
+      fileList.innerHTML = '';
+      uploadBtn.disabled = true;
+      return;
+    }
+    let totalSize = 0;
+    let html = '<ul class="list-group list-group-flush">';
+    for (const f of files) {
+      totalSize += f.size;
+      html += `<li class="list-group-item d-flex justify-content-between py-1 px-2">
+        <span>${f.name}</span>
+        <span class="text-secondary">${humanSize(f.size)}</span>
+      </li>`;
+    }
+    html += '</ul>';
+    html += `<small class="text-secondary">${files.length} file(s), total: ${humanSize(totalSize)}</small>`;
+    fileList.innerHTML = html;
+    uploadBtn.disabled = false;
+  }
+
+  function humanSize(bytes) {
+    const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+    let i = 0;
+    while (bytes >= 1024 && i < units.length - 1) { bytes /= 1024; i++; }
+    return bytes.toFixed(1) + ' ' + units[i];
+  }
+
+  // Upload with progress via XHR
+  uploadForm.addEventListener('submit', function(e) {
+    e.preventDefault();
+    const formData = new FormData(uploadForm);
+    const xhr = new XMLHttpRequest();
+
+    uploadProgress.classList.add('active');
+    uploadBtn.disabled = true;
+
+    xhr.upload.addEventListener('progress', (e) => {
+      if (e.lengthComputable) {
+        const pct = Math.round((e.loaded / e.total) * 100);
+        progressBar.style.width = pct + '%';
+        progressBar.textContent = pct + '%';
+        uploadStatus.textContent = `${humanSize(e.loaded)} / ${humanSize(e.total)}`;
+      }
+    });
+
+    xhr.addEventListener('load', () => {
+      window.location.reload();
+    });
+
+    xhr.addEventListener('error', () => {
+      uploadStatus.textContent = 'Upload failed!';
+      uploadBtn.disabled = false;
+    });
+
+    xhr.open('POST', uploadForm.action);
+    xhr.send(formData);
+  });
+</script>
+{% endblock %}
