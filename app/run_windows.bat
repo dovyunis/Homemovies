@@ -39,6 +39,15 @@ set APP_PASSWORD=changeme
 REM --- Secret key (change to any random text) ---
 set SECRET_KEY=my-super-secret-key-change-me
 
+REM --- ngrok: FREE permanent public URL ---
+REM 1. Sign up free at https://ngrok.com
+REM 2. Copy your auth token from https://dashboard.ngrok.com/get-started/your-authtoken
+REM 3. Go to https://dashboard.ngrok.com/domains → click "New Domain" (free!)
+REM 4. Paste both below:
+set NGROK_AUTH_TOKEN=
+set NGROK_DOMAIN=
+set USE_NGROK=true
+
 REM --- Optionally restrict which drives are shown (comma-separated) ---
 REM set ALLOWED_DRIVES=C,D,E
 
@@ -48,9 +57,6 @@ echo  Username: %APP_USERNAME%
 echo  Password: %APP_PASSWORD%
 echo.
 echo  Starting server on http://localhost:5000
-echo.
-echo  To enable public access, open another terminal and run:
-echo    cloudflared tunnel run homemovies
 echo ============================================
 echo.
 
