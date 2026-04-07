@@ -1,5 +1,8 @@
 import os
+import sys
+import string
 import secrets
+import platform
 from pathlib import Path
 from flask import (
     Flask, render_template, request, redirect, url_for,
@@ -18,11 +21,21 @@ app.secret_key = os.environ.get("SECRET_KEY", secrets.token_hex(32))
 # ---------------------------------------------------------------------------
 # Configuration
 # ---------------------------------------------------------------------------
-# MOVIES_ROOT is the base directory where movie files are stored.
-# On Render (Linux) this will be something like /var/data/movies
-# On your Windows machine you could set it to "D:/Movies" etc.
+# BROWSE_MODE controls how the app finds files:
+#   "drives"  – (Windows) show all available drives (C:\, D:\, etc.) and let user browse freely
+#   "folder"  – restrict browsing to a single MOVIES_ROOT folder
+IS_WINDOWS = platform.system() == "Windows"
+BROWSE_MODE = os.environ.get("BROWSE_MODE", "drives" if IS_WINDOWS else "folder")
+
+# MOVIES_ROOT is only used in "folder" mode
 MOVIES_ROOT = os.environ.get("MOVIES_ROOT", os.path.join(os.getcwd(), "movies"))
-Path(MOVIES_ROOT).mkdir(parents=True, exist_ok=True)
+if BROWSE_MODE == "folder":
+    Path(MOVIES_ROOT).mkdir(parents=True, exist_ok=True)
+
+# ALLOWED_DRIVES – optionally restrict which drives are shown (comma-separated, e.g. "C,D,E")
+# If not set, all available drives are shown
+_allowed_drives_env = os.environ.get("ALLOWED_DRIVES", "")
+ALLOWED_DRIVES = [d.strip().upper() for d in _allowed_drives_env.split(",") if d.strip()] if _allowed_drives_env else []
 
 ALLOWED_EXTENSIONS = {
     "mp4", "mkv", "avi", "mov", "wmv", "flv", "webm",
@@ -157,11 +170,61 @@ def load_user(user_id):
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+def get_windows_drives():
+    """Detect available Windows drives."""
+    drives = []
+    if IS_WINDOWS:
+        for letter in string.ascii_uppercase:
+            drive_path = f"{letter}:\\"
+            if os.path.exists(drive_path):
+                if ALLOWED_DRIVES and letter not in ALLOWED_DRIVES:
+                    continue
+                # Get drive info
+                try:
+                    import shutil
+                    total, used, free = shutil.disk_usage(drive_path)
+                    drives.append({
+                        "letter": letter,
+                        "path": drive_path,
+                        "total": get_human_size(total),
+                        "free": get_human_size(free),
+                        "used_pct": round((used / total) * 100) if total > 0 else 0,
+                    })
+                except (PermissionError, OSError):
+                    drives.append({
+                        "letter": letter,
+                        "path": drive_path,
+                        "total": "N/A",
+                        "free": "N/A",
+                        "used_pct": 0,
+                    })
+    return drives
+
+
+def safe_resolve_path(raw_path):
+    """Resolve a browsing path. In 'drives' mode, allow any valid path.
+    In 'folder' mode, ensure path stays under MOVIES_ROOT."""
+    if BROWSE_MODE == "drives":
+        # raw_path is like "D:/Movies/SomeFolder"
+        target = Path(raw_path).resolve()
+        if not target.exists():
+            abort(404)
+        # On Windows, make sure it's on a real drive
+        if IS_WINDOWS:
+            drive_letter = str(target)[0].upper()
+            if ALLOWED_DRIVES and drive_letter not in ALLOWED_DRIVES:
+                abort(403)
+        return target
+    else:
+        return safe_join_path(MOVIES_ROOT, raw_path)
+
+
 def safe_join_path(base, *parts):
     """Join path parts and ensure result is under base directory."""
     target = Path(base).resolve()
     for p in parts:
-        target = (target / p).resolve()
+        if p:
+            target = (target / p).resolve()
     if not str(target).startswith(str(Path(base).resolve())):
         abort(403)
     return target
@@ -243,7 +306,21 @@ def set_theme(theme_id):
 @app.route("/browse/<path:subpath>")
 @login_required
 def browse(subpath=""):
-    full_path = safe_join_path(MOVIES_ROOT, subpath)
+    # --- DRIVES MODE: show drive list when no subpath ---
+    if BROWSE_MODE == "drives" and not subpath:
+        drives = get_windows_drives()
+        return render_template(
+            "drives.html",
+            drives=drives,
+        )
+
+    # --- Resolve the full path ---
+    if BROWSE_MODE == "drives":
+        # subpath comes in as "D:/folder/subfolder"
+        full_path = safe_resolve_path(subpath)
+    else:
+        full_path = safe_join_path(MOVIES_ROOT, subpath)
+
     if not full_path.exists():
         abort(404)
     if full_path.is_file():
@@ -252,14 +329,31 @@ def browse(subpath=""):
     folders, files = scan_directory(full_path)
 
     # Build breadcrumb
-    breadcrumbs = [{"name": "Home", "path": ""}]
-    if subpath:
-        parts = subpath.split("/")
-        for i, part in enumerate(parts):
-            breadcrumbs.append({
-                "name": part,
-                "path": "/".join(parts[: i + 1])
-            })
+    if BROWSE_MODE == "drives":
+        # e.g. subpath = "D:/Movies/Action"
+        drive_letter = subpath[0].upper()
+        breadcrumbs = [
+            {"name": "Drives", "path": ""},
+            {"name": f"{drive_letter}:\\", "path": f"{drive_letter}:"},
+        ]
+        # Add remaining path parts
+        remaining = subpath[2:].strip("/").strip("\\")  # strip "D:" prefix
+        if remaining:
+            parts = remaining.replace("\\", "/").split("/")
+            for i, part in enumerate(parts):
+                breadcrumbs.append({
+                    "name": part,
+                    "path": f"{drive_letter}:/" + "/".join(parts[: i + 1])
+                })
+    else:
+        breadcrumbs = [{"name": "Home", "path": ""}]
+        if subpath:
+            parts = subpath.split("/")
+            for i, part in enumerate(parts):
+                breadcrumbs.append({
+                    "name": part,
+                    "path": "/".join(parts[: i + 1])
+                })
 
     return render_template(
         "browse.html",
@@ -267,6 +361,7 @@ def browse(subpath=""):
         files=files,
         subpath=subpath,
         breadcrumbs=breadcrumbs,
+        browse_mode=BROWSE_MODE,
     )
 
 
@@ -274,7 +369,10 @@ def browse(subpath=""):
 @login_required
 def upload():
     subpath = request.form.get("subpath", "")
-    target_dir = safe_join_path(MOVIES_ROOT, subpath)
+    if BROWSE_MODE == "drives":
+        target_dir = safe_resolve_path(subpath)
+    else:
+        target_dir = safe_join_path(MOVIES_ROOT, subpath)
     target_dir.mkdir(parents=True, exist_ok=True)
 
     uploaded_files = request.files.getlist("files")
@@ -303,7 +401,11 @@ def create_folder():
         return redirect(url_for("browse", subpath=subpath))
 
     folder_name = secure_filename(folder_name)
-    target = safe_join_path(MOVIES_ROOT, subpath, folder_name)
+    if BROWSE_MODE == "drives":
+        base = safe_resolve_path(subpath)
+        target = base / folder_name
+    else:
+        target = safe_join_path(MOVIES_ROOT, subpath, folder_name)
     target.mkdir(parents=True, exist_ok=True)
     flash(f"Folder '{folder_name}' created.", "success")
     return redirect(url_for("browse", subpath=subpath))
@@ -312,7 +414,10 @@ def create_folder():
 @app.route("/download/<path:subpath>")
 @login_required
 def download(subpath):
-    full_path = safe_join_path(MOVIES_ROOT, subpath)
+    if BROWSE_MODE == "drives":
+        full_path = safe_resolve_path(subpath)
+    else:
+        full_path = safe_join_path(MOVIES_ROOT, subpath)
     if not full_path.is_file():
         abort(404)
     return send_from_directory(full_path.parent, full_path.name, as_attachment=True)
@@ -326,7 +431,10 @@ def delete():
     if not filename:
         abort(400)
 
-    full_path = safe_join_path(MOVIES_ROOT, subpath, filename)
+    if BROWSE_MODE == "drives":
+        full_path = safe_resolve_path(subpath + "/" + filename if subpath else filename)
+    else:
+        full_path = safe_join_path(MOVIES_ROOT, subpath, filename)
     if full_path.is_file():
         full_path.unlink()
         flash(f"Deleted '{filename}'.", "success")

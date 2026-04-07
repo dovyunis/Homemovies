@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}Drives – Home Movies{% endblock %}
+
+{% block content %}
+<h4 class="mb-4"><i class="bi bi-hdd-fill" style="color: var(--accent);"></i> Select a Drive</h4>
+
+<div class="row g-3">
+  {% for drive in drives %}
+  <div class="col-md-4 col-lg-3">
+    <a href="{{ url_for('browse', subpath=drive.letter ~ ':') }}" class="text-decoration-none">
+      <div class="card h-100" style="border-top: 3px solid var(--accent); transition: transform .2s, box-shadow .2s;"
+           onmouseover="this.style.transform='translateY(-4px)'; this.style.boxShadow='0 8px 25px rgba(0,0,0,.4)'"
+           onmouseout="this.style.transform=''; this.style.boxShadow=''">
+        <div class="card-body text-center">
+          <i class="bi bi-hdd-fill" style="font-size: 2.5rem; color: var(--accent);"></i>
+          <h5 class="mt-2" style="color: var(--text-color);">{{ drive.letter }}:\</h5>
+          
+          {% if drive.total != "N/A" %}
+          <!-- Usage bar -->
+          <div class="progress mt-3" style="height: 8px; background: rgba(255,255,255,.1);">
+            <div class="progress-bar" role="progressbar" 
+                 style="width: {{ drive.used_pct }}%; background: {% if drive.used_pct > 90 %}#ff4444{% elif drive.used_pct > 70 %}#ffaa00{% else %}var(--accent){% endif %};">
+            </div>
+          </div>
+          <div class="mt-2 d-flex justify-content-between">
+            <small style="color: var(--text-color); opacity:.6;">Free: {{ drive.free }}</small>
+            <small style="color: var(--text-color); opacity:.6;">Total: {{ drive.total }}</small>
+          </div>
+          <small style="color: var(--text-color); opacity:.4;">{{ drive.used_pct }}% used</small>
+          {% else %}
+          <small class="d-block mt-2" style="color: var(--text-color); opacity:.5;">Drive info unavailable</small>
+          {% endif %}
+        </div>
+      </div>
+    </a>
+  </div>
+  {% endfor %}
+
+  {% if not drives %}
+  <div class="col-12 text-center py-5">
+    <i class="bi bi-hdd" style="font-size: 3rem; color: var(--accent); opacity:.5;"></i>
+    <p class="mt-3" style="color: var(--text-color); opacity:.6;">No drives detected. Make sure the app is running on Windows.</p>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}
