@@ -136,6 +136,10 @@
       </a>
       {% if current_user.is_authenticated %}
       <div class="d-flex align-items-center gap-2">
+        <!-- Home Button -->
+        <a href="{{ url_for('browse') }}" class="btn btn-sm btn-outline-light" title="Home - Drives">
+          <i class="bi bi-house-fill"></i><span class="d-none d-md-inline"> Home</span>
+        </a>
         <!-- Theme Selector -->
         <div class="dropdown">
           <button class="btn btn-sm btn-outline-light" type="button" data-bs-toggle="dropdown" title="Change Theme">
