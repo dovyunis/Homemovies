@@ -118,6 +118,28 @@ if ($cloudflaredExe -and (Test-Path $cloudflaredExe)) {
     if ($publicUrl) {
         Log "Internet URL: $publicUrl"
         "Your Home Movies URL: $publicUrl`r`nLogin: dov / yunis2026`r`nURL changes on restart - check this file again." | Set-Content $urlFile -Encoding utf8
+
+        # Send email notification
+        $notifyConf = Join-Path $appDir "notify.conf"
+        if (Test-Path $notifyConf) {
+            try {
+                $gmailUser = $null; $gmailPass = $null; $emailTo = $null
+                Get-Content $notifyConf | ForEach-Object {
+                    if ($_ -match "^GMAIL_USER=(.+)$") { $gmailUser = $matches[1] }
+                    if ($_ -match "^GMAIL_PASS=(.+)$") { $gmailPass = $matches[1] }
+                    if ($_ -match "^EMAIL_TO=(.+)$") { $emailTo = $matches[1] }
+                }
+                if ($gmailUser -and $gmailPass -and $emailTo) {
+                    $secPass = ConvertTo-SecureString $gmailPass -AsPlainText -Force
+                    $cred = New-Object System.Management.Automation.PSCredential($gmailUser, $secPass)
+                    $body = "Home Movies started.`n`nURL: $publicUrl`n`nLogin: dov / yunis2026"
+                    Send-MailMessage -From $gmailUser -To $emailTo -Subject "Home Movies - New URL" -Body $body -SmtpServer "smtp.gmail.com" -Port 587 -UseSsl -Credential $cred
+                    Log "Email notification sent to $emailTo"
+                }
+            } catch {
+                Log "Email notification failed: $($_.Exception.Message)"
+            }
+        }
     } else {
         Log "WARNING: Could not detect tunnel URL"
         "Local: http://localhost:5000`r`nLogin: dov / yunis2026`r`nTunnel URL not detected - check homemovies.log" | Set-Content $urlFile -Encoding utf8

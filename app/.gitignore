@@ -1,0 +1,10 @@
+venv/
+__pycache__/
+*.pyc
+homemovies.log
+homemovies.pid
+internet_url.txt
+tunnel_output.tmp
+notify.conf
+paths.conf
+.DS_Store
