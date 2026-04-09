@@ -37,22 +37,21 @@ call venv\Scripts\activate.bat
 pip install -r requirements.txt --quiet
 
 echo.
-echo  Starting Cloudflare Tunnel...
-echo  (Look for your public URL in the new window)
-echo.
-start "Cloudflare Tunnel" cmd /k "cloudflared tunnel --url http://localhost:5000"
+echo  Step 1: Starting Home Movies Server...
+start "Home Movies Server" cmd /k "call venv\Scripts\activate.bat && set APP_USERNAME=%APP_USERNAME% && set APP_PASSWORD=%APP_PASSWORD% && set SECRET_KEY=%SECRET_KEY% && python app.py"
 
-REM Wait a moment for the tunnel to start
-timeout /t 3 >nul
+REM Wait for Flask to start
+echo  Waiting for server to start...
+timeout /t 5 >nul
 
-echo  Starting Home Movies Server...
+echo  Step 2: Starting Cloudflare Tunnel...
 echo.
 echo  ============================================
 echo   Local:  http://localhost:5000
-echo   Public: Check the Cloudflare Tunnel window
-echo           for your https://....trycloudflare.com URL
+echo   Public: Look below for your public URL
+echo           (https://....trycloudflare.com)
 echo  ============================================
 echo.
 
-python app.py
+cloudflared tunnel --url http://localhost:5000
 pause
