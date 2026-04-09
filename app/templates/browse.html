@@ -10,7 +10,11 @@
         <li class="breadcrumb-item active">{{ crumb.name }}</li>
       {% else %}
         <li class="breadcrumb-item">
-          <a href="{{ url_for('browse', subpath=crumb.path) }}">{{ crumb.name }}</a>
+          {% if crumb.path %}
+            <a href="{{ url_for('browse', subpath=crumb.path) }}">{{ crumb.name }}</a>
+          {% else %}
+            <a href="{{ url_for('browse') }}">{{ crumb.name }}</a>
+          {% endif %}
         </li>
       {% endif %}
     {% endfor %}
@@ -68,8 +72,12 @@
       {% if subpath %}
       <tr>
         <td colspan="3">
-          <a href="{{ url_for('browse', subpath=subpath.rsplit('/', 1)[0] if '/' in subpath else '') }}"
-             class="text-decoration-none">
+          {% set parent = subpath.rsplit('/', 1)[0] if '/' in subpath else '' %}
+          {% if parent %}
+            <a href="{{ url_for('browse', subpath=parent) }}" class="text-decoration-none">
+          {% else %}
+            <a href="{{ url_for('browse') }}" class="text-decoration-none">
+          {% endif %}
             <i class="bi bi-arrow-left file-icon"></i> .. (back)
           </a>
         </td>
