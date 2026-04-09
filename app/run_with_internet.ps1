@@ -87,13 +87,43 @@ Write-Host "          https://....trycloudflare.com URL" -ForegroundColor Green
 Write-Host "============================================" -ForegroundColor Cyan
 Write-Host ""
 
-# Run tunnel in foreground (so user can see the URL)
+# Start tunnel and capture URL to file
+$appDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+if (-not $appDir) { $appDir = $PWD.Path }
+$urlFile = "$appDir\internet_url.txt"
+
+$tunnelJob = Start-Job -ScriptBlock {
+    param($urlFilePath)
+    $process = Start-Process -FilePath "cloudflared" -ArgumentList "tunnel", "--url", "http://localhost:5000" -NoNewWindow -RedirectStandardError "$env:TEMP\cloudflared_output.txt" -PassThru
+    Start-Sleep -Seconds 10
+    # Read the output to find the URL
+    if (Test-Path "$env:TEMP\cloudflared_output.txt") {
+        $output = Get-Content "$env:TEMP\cloudflared_output.txt" -Raw
+        if ($output -match "(https://[a-zA-Z0-9\-]+\.trycloudflare\.com)") {
+            $publicUrl = $matches[1]
+            @"
+Your Home Movies internet URL:
+$publicUrl
+
+Login: dov / yunis2026
+
+NOTE: This URL changes when the app restarts.
+Check this file again after a reboot.
+"@ | Set-Content -Path $urlFilePath
+        }
+    }
+    $process.WaitForExit()
+} -ArgumentList $urlFile
+
+# Also run in foreground so user sees output
 try {
     cloudflared tunnel --url http://localhost:5000
 } finally {
-    # Cleanup: stop Flask when tunnel is closed
+    # Cleanup: stop Flask and tunnel when closed
     Stop-Job $flaskJob -ErrorAction SilentlyContinue
     Remove-Job $flaskJob -ErrorAction SilentlyContinue
+    Stop-Job $tunnelJob -ErrorAction SilentlyContinue
+    Remove-Job $tunnelJob -ErrorAction SilentlyContinue
     Write-Host "  Server stopped." -ForegroundColor Yellow
     Read-Host "Press Enter to exit"
 }

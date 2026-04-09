@@ -81,14 +81,75 @@ $existingService = Get-Service -Name "HomeMoviesService" -ErrorAction SilentlyCo
 if ($existingService) {
     Write-Host "  Stopping existing service..." -ForegroundColor Yellow
     Stop-Service -Name "HomeMoviesService" -ErrorAction SilentlyContinue
-    & "$appDir\venv\Scripts\python.exe" "$appDir\service.py" remove 2>$null
+    Start-Sleep -Seconds 2
+    sc.exe delete HomeMoviesService 2>$null
     Start-Sleep -Seconds 2
 }
 
-# Install the service
+# Install the service using pywin32
 Write-Host ""
 Write-Host "  Installing Home Movies service..." -ForegroundColor Yellow
-& "$appDir\venv\Scripts\python.exe" "$appDir\service.py" install
+$installOutput = & "$appDir\venv\Scripts\python.exe" "$appDir\service.py" install 2>&1
+Write-Host $installOutput
+
+# Verify service was created
+Start-Sleep -Seconds 2
+$svc = Get-Service -Name "HomeMoviesService" -ErrorAction SilentlyContinue
+if (-not $svc) {
+    Write-Host ""
+    Write-Host "  pywin32 service install failed. Trying sc.exe fallback..." -ForegroundColor Yellow
+    
+    $pythonExe = "$appDir\venv\Scripts\python.exe"
+    $serviceCmd = "`"$pythonExe`" `"$appDir\service.py`""
+    
+    # Use sc.exe to create service directly
+    sc.exe create HomeMoviesService binPath= "$pythonExe $appDir\service.py" start= auto DisplayName= "Home Movies Web App"
+    Start-Sleep -Seconds 2
+    $svc = Get-Service -Name "HomeMoviesService" -ErrorAction SilentlyContinue
+}
+
+if (-not $svc) {
+    Write-Host ""
+    Write-Host "  ============================================" -ForegroundColor Red
+    Write-Host "  Service install FAILED with both methods." -ForegroundColor Red
+    Write-Host ""
+    Write-Host "  Using STARTUP TASK instead (works just as well!)" -ForegroundColor Yellow
+    Write-Host "  ============================================" -ForegroundColor Red
+    Write-Host ""
+    
+    # Create a startup VBS script (runs hidden, no console window)
+    $startupFolder = [System.Environment]::GetFolderPath("Startup")
+    $vbsPath = "$startupFolder\HomeMovies.vbs"
+    $ps1Path = "$appDir\run_with_internet.ps1"
+    
+    $vbsContent = @"
+Set WshShell = CreateObject("WScript.Shell")
+WshShell.Run "powershell.exe -ExecutionPolicy Bypass -WindowStyle Hidden -File ""$ps1Path""", 0, False
+"@
+    Set-Content -Path $vbsPath -Value $vbsContent
+    
+    Write-Host "  Created startup task: $vbsPath" -ForegroundColor Green
+    Write-Host "  The app will auto-start (hidden) on login." -ForegroundColor Green
+    Write-Host ""
+    Write-Host "  Starting now..." -ForegroundColor Yellow
+    Start-Process powershell -ArgumentList "-ExecutionPolicy Bypass -File `"$ps1Path`"" -WindowStyle Hidden
+    Start-Sleep -Seconds 15
+    
+    # Check for URL file
+    $urlFile = "$appDir\internet_url.txt"
+    if (Test-Path $urlFile) {
+        $urlContent = Get-Content $urlFile
+        $publicUrl = ($urlContent | Select-String -Pattern "https://.*trycloudflare\.com").Matches.Value
+        if ($publicUrl) {
+            Write-Host "  Internet: $publicUrl" -ForegroundColor Green
+        }
+    }
+    Write-Host "  Local: http://localhost:5000" -ForegroundColor Green
+    Write-Host "  Login: dov / yunis2026" -ForegroundColor White
+    Write-Host ""
+    Read-Host "Press Enter to exit"
+    exit 0
+}
 
 # Set service to start automatically
 Write-Host "  Setting service to start automatically..." -ForegroundColor Yellow
