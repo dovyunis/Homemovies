@@ -209,9 +209,40 @@ def get_windows_drives():
     return drives
 
 
+def normalise_drive_subpath(subpath):
+    """Convert URL-safe subpath to a real Windows path.
+    URLs use 'C/Users/folder' (no colon) → returns 'C:/Users/folder'
+    Also handles legacy 'C:/...' and 'C:' formats.
+    """
+    if not subpath:
+        return subpath
+    # Already has colon in second position: "C:" or "C:/..."
+    if len(subpath) >= 2 and subpath[1] == ":":
+        return subpath
+    # Single letter "C" → "C:/"
+    if len(subpath) == 1 and subpath.isalpha():
+        return subpath.upper() + ":/"
+    # "C/Users/folder" → "C:/Users/folder"
+    if len(subpath) >= 2 and subpath[0].isalpha() and subpath[1] == "/":
+        return subpath[0].upper() + ":/" + subpath[2:]
+    return subpath
+
+
+def subpath_for_url(subpath):
+    """Convert a real path subpath to URL-safe (no colons).
+    'C:/Users/folder' → 'C/Users/folder'
+    """
+    if not subpath:
+        return subpath
+    if len(subpath) >= 2 and subpath[1] == ":":
+        return subpath[0].upper() + subpath[2:]
+    return subpath
+
+
 def safe_resolve_path(raw_path):
     """Resolve a browsing path. In drives mode allow any valid path."""
     if BROWSE_MODE == "drives":
+        raw_path = normalise_drive_subpath(raw_path)
         target = Path(raw_path).resolve()
         if not target.exists():
             abort(404)
@@ -317,6 +348,8 @@ def browse(subpath=""):
     # Resolve the full path
     if BROWSE_MODE == "drives":
         full_path = safe_resolve_path(subpath)
+        # Make sure subpath is URL-safe (no colons) for templates
+        subpath = subpath_for_url(normalise_drive_subpath(subpath))
     else:
         full_path = safe_join_path(MOVIES_ROOT, subpath)
 
@@ -332,15 +365,16 @@ def browse(subpath=""):
         drive_letter = subpath[0].upper()
         breadcrumbs = [
             {"name": "Drives", "path": ""},
-            {"name": f"{drive_letter}:\\", "path": f"{drive_letter}:"},
+            {"name": f"{drive_letter}:\\", "path": f"{drive_letter}"},
         ]
-        remaining = subpath[2:].strip("/").strip("\\")
+        # Strip drive letter prefix: "C/Users/folder" → "Users/folder"
+        remaining = subpath[1:].lstrip("/")
         if remaining:
             parts = remaining.replace("\\", "/").split("/")
             for i, part in enumerate(parts):
                 breadcrumbs.append({
                     "name": part,
-                    "path": f"{drive_letter}:/" + "/".join(parts[: i + 1])
+                    "path": f"{drive_letter}/" + "/".join(parts[: i + 1])
                 })
     else:
         breadcrumbs = [{"name": "Home", "path": ""}]

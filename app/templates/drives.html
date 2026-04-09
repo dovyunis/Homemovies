@@ -7,7 +7,7 @@
 <div class="row g-3">
   {% for drive in drives %}
   <div class="col-md-4 col-lg-3">
-    <a href="{{ url_for('browse', subpath=drive.letter ~ ':') }}" class="text-decoration-none">
+    <a href="{{ url_for('browse', subpath=drive.letter) }}" class="text-decoration-none">
       <div class="card h-100" style="border-top: 3px solid var(--accent); transition: transform .2s, box-shadow .2s;"
            onmouseover="this.style.transform='translateY(-4px)'; this.style.boxShadow='0 8px 25px rgba(0,0,0,.4)'"
            onmouseout="this.style.transform=''; this.style.boxShadow=''">
