@@ -3,80 +3,50 @@
 #  Stops Flask, Cloudflare Tunnel, and launcher
 # ============================================
 
-$appDir = Split-Path -Parent $MyInvocation.MyCommand.Path
-$pidFile = "$appDir\homemovies.pid"
-
 Write-Host ""
 Write-Host "  Stopping Home Movies..." -ForegroundColor Yellow
 
-# Stop the scheduled task if running
+# Stop the scheduled task
 try {
-    $task = Get-ScheduledTask -TaskName "HomeMoviesAutoStart" -ErrorAction SilentlyContinue
-    if ($task -and $task.State -eq "Running") {
-        Stop-ScheduledTask -TaskName "HomeMoviesAutoStart" -ErrorAction SilentlyContinue
-        Write-Host "  Stopped scheduled task" -ForegroundColor Gray
-    }
+    Stop-ScheduledTask -TaskName "HomeMoviesAutoStart" -ErrorAction SilentlyContinue
+    Write-Host "  Stopped scheduled task" -ForegroundColor Gray
 } catch {}
 
-# Kill processes by PID file
-if (Test-Path $pidFile) {
-    $pids = Get-Content $pidFile
-    foreach ($p in $pids) {
-        try {
-            $proc = Get-Process -Id $p -ErrorAction SilentlyContinue
-            if ($proc) {
-                Stop-Process -Id $p -Force
-                Write-Host "  Killed process $p ($($proc.Name))" -ForegroundColor Gray
-            }
-        } catch {}
-    }
-    Remove-Item $pidFile -Force
-}
+# Kill all python and cloudflared processes
+taskkill /F /IM python.exe 2>$null
+taskkill /F /IM python3.12.exe 2>$null
+taskkill /F /IM cloudflared.exe 2>$null
 
-# Kill ALL cloudflared processes
-$cfProcs = Get-Process -Name "cloudflared" -ErrorAction SilentlyContinue
-if ($cfProcs) {
-    $cfProcs | Stop-Process -Force
-    Write-Host "  Killed cloudflared" -ForegroundColor Gray
-}
+Write-Host "  Killed python and cloudflared" -ForegroundColor Gray
 
-# Kill python processes running app.py (check command line via WMI)
-try {
-    $pyProcs = Get-WmiObject Win32_Process -Filter "Name='python.exe'" -ErrorAction SilentlyContinue
-    foreach ($proc in $pyProcs) {
-        if ($proc.CommandLine -like "*app.py*") {
-            Stop-Process -Id $proc.ProcessId -Force -ErrorAction SilentlyContinue
-            Write-Host "  Killed python $($proc.ProcessId)" -ForegroundColor Gray
-        }
-    }
-} catch {}
-
-# Kill any powershell running start_homemovies.ps1
+# Kill any powershell running start_homemovies
 try {
     $psProcs = Get-WmiObject Win32_Process -Filter "Name='powershell.exe'" -ErrorAction SilentlyContinue
     foreach ($proc in $psProcs) {
         if ($proc.CommandLine -like "*start_homemovies*") {
-            Stop-Process -Id $proc.ProcessId -Force -ErrorAction SilentlyContinue
+            taskkill /F /PID $proc.ProcessId 2>$null
             Write-Host "  Killed launcher $($proc.ProcessId)" -ForegroundColor Gray
         }
     }
 } catch {}
 
-# Clean up temp files
-Remove-Item "$appDir\tunnel_output.tmp" -Force -ErrorAction SilentlyContinue
-
 Start-Sleep -Seconds 2
 
-# Verify nothing is listening on port 5000
-$listening = netstat -ano 2>$null | Select-String ":5000 " | Select-String "LISTENING"
-if ($listening) {
-    Write-Host "  WARNING: Port 5000 still in use. Force killing..." -ForegroundColor Yellow
-    $listening | ForEach-Object {
+# Verify port 5000 is free
+$still = netstat -ano 2>$null | findstr ":5000" | findstr "LISTENING"
+if ($still) {
+    Write-Host "  Port 5000 still in use, force killing..." -ForegroundColor Yellow
+    $still | ForEach-Object {
         if ($_ -match '\s+(\d+)\s*$') {
-            Stop-Process -Id $matches[1] -Force -ErrorAction SilentlyContinue
+            taskkill /F /PID $matches[1] 2>$null
         }
     }
 }
+
+# Clean up files
+$appDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+Remove-Item "$appDir\homemovies.pid" -Force -ErrorAction SilentlyContinue
+Remove-Item "$appDir\tunnel_output.tmp" -Force -ErrorAction SilentlyContinue
 
 Write-Host "  Home Movies stopped." -ForegroundColor Green
 Write-Host ""
