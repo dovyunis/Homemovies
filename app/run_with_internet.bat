@@ -37,19 +37,32 @@ call venv\Scripts\activate.bat
 pip install -r requirements.txt --quiet
 
 echo.
-echo  Step 1: Starting Home Movies Server...
-start "Home Movies Server" cmd /k "call venv\Scripts\activate.bat && set APP_USERNAME=%APP_USERNAME% && set APP_PASSWORD=%APP_PASSWORD% && set SECRET_KEY=%SECRET_KEY% && python app.py"
+echo  Step 1: Starting Home Movies Server in background...
 
-REM Wait for Flask to start
-echo  Waiting for server to start...
-timeout /t 5 >nul
+REM Start Flask in background using pythonw or start /b
+start /b python app.py
 
+echo  Waiting for server to be ready...
+timeout /t 8 >nul
+
+REM Verify server is running
+curl -s -o nul http://localhost:5000/login
+if %ERRORLEVEL% NEQ 0 (
+    echo.
+    echo  ERROR: Flask server failed to start!
+    echo  Try running "python app.py" manually to see the error.
+    pause
+    exit /b 1
+)
+
+echo  Server is running!
+echo.
 echo  Step 2: Starting Cloudflare Tunnel...
 echo.
 echo  ============================================
 echo   Local:  http://localhost:5000
-echo   Public: Look below for your public URL
-echo           (https://....trycloudflare.com)
+echo   Public: Look below for your
+echo           https://....trycloudflare.com URL
 echo  ============================================
 echo.
 
