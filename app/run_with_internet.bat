@@ -5,8 +5,8 @@ echo ============================================
 echo.
 
 REM --- EDIT YOUR SETTINGS ---
-set APP_USERNAME=admin
-set APP_PASSWORD=changeme
+set APP_USERNAME=dov
+set APP_PASSWORD=yunis2026
 set SECRET_KEY=my-super-secret-key-change-me
 REM set ALLOWED_DRIVES=C,D,E
 

@@ -3,8 +3,8 @@
 # ============================================
 
 # --- EDIT YOUR SETTINGS ---
-$env:APP_USERNAME = "admin"
-$env:APP_PASSWORD = "changeme"
+$env:APP_USERNAME = "dov"
+$env:APP_PASSWORD = "yunis2026"
 $env:SECRET_KEY = "my-super-secret-key-change-me"
 # $env:ALLOWED_DRIVES = "C,D,E"
 

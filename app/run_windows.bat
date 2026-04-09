@@ -33,8 +33,8 @@ REM    EDIT YOUR SETTINGS BELOW
 REM ============================================
 
 REM --- Login credentials ---
-set APP_USERNAME=admin
-set APP_PASSWORD=changeme
+set APP_USERNAME=dov
+set APP_PASSWORD=yunis2026
 
 REM --- Secret key (change to any random text) ---
 set SECRET_KEY=my-super-secret-key-change-me
