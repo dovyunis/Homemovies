@@ -6,20 +6,14 @@
 Write-Host ""
 Write-Host "  Stopping Home Movies..." -ForegroundColor Yellow
 
-# Stop the scheduled task
+# Stop the scheduled task (both methods for reliability)
 try {
     Stop-ScheduledTask -TaskName "HomeMoviesAutoStart" -ErrorAction SilentlyContinue
-    Write-Host "  Stopped scheduled task" -ForegroundColor Gray
 } catch {}
+schtasks /End /TN "HomeMoviesAutoStart" 2>$null
+Write-Host "  Stopped scheduled task" -ForegroundColor Gray
 
-# Kill all python and cloudflared processes
-taskkill /F /IM python.exe 2>$null
-taskkill /F /IM python3.12.exe 2>$null
-taskkill /F /IM cloudflared.exe 2>$null
-
-Write-Host "  Killed python and cloudflared" -ForegroundColor Gray
-
-# Kill any powershell running start_homemovies
+# Kill any powershell running start_homemovies FIRST
 try {
     $psProcs = Get-WmiObject Win32_Process -Filter "Name='powershell.exe'" -ErrorAction SilentlyContinue
     foreach ($proc in $psProcs) {
@@ -29,6 +23,13 @@ try {
         }
     }
 } catch {}
+
+# Kill all python and cloudflared processes
+taskkill /F /IM python.exe 2>$null
+taskkill /F /IM python3.12.exe 2>$null
+taskkill /F /IM cloudflared.exe 2>$null
+
+Write-Host "  Killed python and cloudflared" -ForegroundColor Gray
 
 Start-Sleep -Seconds 2
 
